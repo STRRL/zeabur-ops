@@ -1,5 +1,6 @@
 use anyhow::Result;
 use dotenv::dotenv;
+use std::collections::HashMap;
 use std::env;
 use tokio::time::{interval, Duration};
 use zeabur_ops::log::{
@@ -22,9 +23,6 @@ async fn main() -> Result<()> {
     // Initialize the ZeaburClient
     let client = ZeaburClient::new(get_env_var("ZEABUR_API_KEY")?);
 
-    // Initialize the OTLP log sink
-    let sink = OtlpLogSink::new_http()?;
-
     // Create an interval for running the process every 5 seconds
     let mut interval = interval(Duration::from_secs(5));
 
@@ -33,25 +31,49 @@ async fn main() -> Result<()> {
     loop {
         interval.tick().await;
 
-        match collect_and_sink_logs_for_all_services(&client, &sink).await {
-            Ok(total_log_count) => println!("Successfully processed {} logs in total", total_log_count),
+        match collect_and_sink_logs_for_all_services(&client).await {
+            Ok(total_log_count) => {
+                println!("Successfully processed {} logs in total", total_log_count)
+            }
             Err(e) => eprintln!("Error processing logs: {}", e),
         }
     }
 }
 
-async fn collect_and_sink_logs_for_all_services(client: &ZeaburClient, sink: &OtlpLogSink) -> Result<usize> {
+async fn collect_and_sink_logs_for_all_services(
+    client: &ZeaburClient,
+) -> Result<usize> {
     let projects = client.list_projects().await?;
     let mut total_log_count = 0;
 
     for project in projects {
         println!("Processing project: {} (ID: {})", project.name, project.id);
-        
+
         let environments = client.get_environments_of_project(&project.id).await?;
-        let services = client.get_services_of_project(&project.id, &environments.environments[0].id).await?;
+        let services = client
+            .get_services_of_project(&project.id, &environments.environments[0].id)
+            .await?;
 
         for service in services {
             for environment in &environments.environments {
+                // Create labels for this specific service and environment
+                let mut labels = HashMap::new();
+                
+                // loki has its taste on indexing labels: https://grafana.com/docs/loki/latest/send-data/otel/#format-considerations
+                labels.insert("service.name".to_string(), service.name.clone());
+                labels.insert("service.namespace".to_string(), project.name.clone());
+                labels.insert("cloud.region".to_string(), format!("{}-{}-{}", project.region.provider, project.region.name,project.region.id));
+
+                labels.insert("project_name".to_string(), project.name.clone());
+                labels.insert("service_name".to_string(), service.name.clone());
+                labels.insert("environment_name".to_string(), environment.name.clone());
+                labels.insert("project_id".to_string(), project.id.clone());
+                labels.insert("service_id".to_string(), service.id.clone());
+                labels.insert("environment_id".to_string(), environment.id.clone());
+
+                // Create a new sink for this specific service and environment
+                let sink = OtlpLogSink::new_http(labels)?;
+
                 let collector = ZeaburServiceLogCollector::new(
                     project.id.clone(),
                     environment.id.clone(),
@@ -59,7 +81,7 @@ async fn collect_and_sink_logs_for_all_services(client: &ZeaburClient, sink: &Ot
                     client.clone(),
                 );
 
-                match collect_and_sink_logs(&collector, sink).await {
+                match collect_and_sink_logs(&collector, &sink).await {
                     Ok(log_count) => {
                         println!(
                             "Processed {} logs for Project: {} (ID: {}), Service: {} (ID: {}), Environment: {} (ID: {})",

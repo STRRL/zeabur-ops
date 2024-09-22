@@ -2,7 +2,7 @@ use super::{log_collector::LogCollector, log_entry::LogEntry};
 use crate::zeabur::client::ZeaburClient;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 
 // Define the ZeaburServiceLogCollector struct

@@ -3,10 +3,12 @@ use crate::log::log_sink::LogSink;
 use anyhow::Error;
 use async_trait::async_trait;
 use opentelemetry::logs::{LogRecord as OtlpLogRecord, Severity};
+use opentelemetry::KeyValue;
 use opentelemetry_otlp::{HttpExporterBuilder, LogExporter as OtlpLogExporter, WithExportConfig};
 use opentelemetry_sdk::export::logs::{LogBatch, LogExporter};
 use opentelemetry_sdk::logs::LogRecord;
-use opentelemetry_sdk::InstrumentationLibrary;
+use opentelemetry_sdk::{InstrumentationLibrary, Resource};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::Mutex;
@@ -18,10 +20,18 @@ pub struct OtlpLogSink {
 
 impl OtlpLogSink {
     // New constructor using HTTP protocol for vector.dev
-    pub fn new_http() -> Result<Self, Error> {
-        let exporter = HttpExporterBuilder::default()
+    pub fn new_http(labels: HashMap<String, String>) -> Result<Self, Error> {
+        let mut exporter = HttpExporterBuilder::default()
             .with_timeout(std::time::Duration::from_secs(3))
             .build_log_exporter()?;
+
+        let kvs: Vec<KeyValue> = labels
+            .into_iter()
+            .map(|(k, v)| KeyValue::new(k, v))
+            .collect();
+        let resource = Resource::new(kvs);
+
+        exporter.set_resource(&resource);
 
         Ok(OtlpLogSink {
             exporter: Arc::new(Mutex::new(Box::new(exporter))),
