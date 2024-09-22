@@ -2,9 +2,10 @@ use anyhow::{Context, Result};
 use reqwest::Client;
 use serde_json::Value;
 
+#[derive(Clone)]
 pub struct ZeaburClient {
-    pub(crate) api_key: String,
-    pub(crate) client: Client,
+    api_key: String,
+    client: Client,
 }
 
 impl ZeaburClient {

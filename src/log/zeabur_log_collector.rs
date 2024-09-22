@@ -29,13 +29,12 @@ impl ZeaburServiceLogCollector {
         project_id: String,
         environment_id: String,
         service_id: String,
-        api_key: String,
+        client: ZeaburClient,
     ) -> Self {
-        let client = ZeaburClient::new(api_key);
         Self {
             project_id,
-            environment_id,
             service_id,
+            environment_id,
             client,
             last_timestamp: Arc::new(Mutex::new(None)),
         }
