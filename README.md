@@ -6,8 +6,8 @@ zeabur-ops collect and transform the observability data from the zeabur platform
 
 ## Roadmap
 
-- [ ] Polling services logs from Zeabur API
-- [ ] Sink to the vector.dev, then observability platform like Grafana Cloud
+- [x] Polling services logs from Zeabur API
+- [x] Sink to the vector.dev, then observability platform like Grafana Cloud
 - [ ] Deploy as a Zeabur Template
 - [ ] Collect metrics and cost data
 - [ ] Grafana Dashboard
